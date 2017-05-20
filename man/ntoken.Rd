@@ -14,6 +14,9 @@ ntype(x, ...)
 \link{tokens}, or \link{dfm} object}
 
 \item{...}{additional arguments passed to \code{\link{tokens}}}
+
+\item{original}{if TRUE, return the count of tokens before a dictionary was 
+applied to x}
 }
 \value{
 count of the total tokens or types

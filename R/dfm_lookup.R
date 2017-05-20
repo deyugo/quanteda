@@ -61,7 +61,6 @@ dfm_lookup <- function(x, dictionary, levels = 1:5,
     
     dictionary <- flatten_dictionary(dictionary, levels)
     valuetype <- match.arg(valuetype)
-    attrs <- attributes(x)
     
     # cannot/should not apply dictionaries with multi-word keys to a dfm
     if (any(stri_detect_fixed(unlist(dictionary, use.names = FALSE), attr(dictionary, 'concatenator'))) &&
@@ -108,9 +107,12 @@ dfm_lookup <- function(x, dictionary, levels = 1:5,
             result <- x
         }
     }
+    
+    docvars(result, "_doclen") <- ntoken(x)
+    attributes(result, FALSE) <- attributes(x)
     attr(result, "what") <- "dictionary"
     attr(result, "dictionary") <- dictionary
-    attributes(result, FALSE) <- attributes(x)
+    
     return(result)
 }
 

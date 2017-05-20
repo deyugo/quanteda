@@ -92,6 +92,8 @@ nfeature.tokens <- function(x) {
 #' Get the count of tokens (total features) or types (unique tokens).
 #' @param x a \pkg{quanteda} object: a character, \link{corpus}, 
 #'   \link{tokens}, or \link{dfm} object
+#' @param original if TRUE, return the count of tokens before a dictionary was 
+#'   applied to x
 #' @param ... additional arguments passed to \code{\link{tokens}}
 #' @note Due to differences between raw text tokens and features that have been 
 #'   defined for a \link{dfm}, the counts be different for dfm objects and the 
@@ -123,15 +125,6 @@ ntoken <- function(x, ...) {
     UseMethod("ntoken")
 }
 
-#' @rdname ntoken
-#' @details 
-#' For \link{dfm} objects, \code{ntype} will only return the count of features
-#' that occur more than zero times in the dfm.
-#' @export
-ntype <- function(x, ...) {
-    UseMethod("ntype")
-}
-
 #' @noRd
 #' @export
 ntoken.corpus <- function(x, ...) {
@@ -150,13 +143,36 @@ ntoken.character <- function(x, ...) {
 ntoken.dfm <- function(x, ...) {
     if (length(list(...)) > 0)
         warning("additional arguments not used for ntoken.dfm()")
-    rowSums(x)
+    if (original && check_docvars(x@docvars, '_doclen', TRUE)) {
+        docvars(x, '_doclen')
+    } else {
+        rowSums(x)
+    }
 }
 
 #' @noRd
 #' @export
 ntoken.tokenizedTexts <- function(x, ...) {
     lengths(x)
+}
+
+#' @export
+#' @noRd
+ntoken.tokens <- function(x, original = FALSE, ...) {
+    if (original && check_docvars(attr(x, 'docvars'), '_doclen', TRUE)) {
+        docvars(x, '_doclen')
+    } else {
+        lengths(x)   
+    }
+}
+
+#' @rdname ntoken
+#' @details 
+#' For \link{dfm} objects, \code{ntype} will only return the count of features
+#' that occur more than zero times in the dfm.
+#' @export
+ntype <- function(x, ...) {
+    UseMethod("ntype")
 }
 
 #' @noRd
@@ -183,12 +199,6 @@ ntype.dfm <- function(x, ...) {
 #' @export
 ntype.tokenizedTexts <- function(x, ...) {
     vapply(lapply(x, unique), length, integer(1))
-}
-
-#' @export
-#' @noRd
-ntoken.tokens <- function(x, ...) {
-    lengths(x)
 }
 
 #' @export

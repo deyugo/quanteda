@@ -22,46 +22,24 @@ docvars <- function(x, field = NULL) {
 #' @noRd
 #' @export
 docvars.corpus <- function(x, field = NULL) {
-    check_fields(x, field)
-    dvars <- documents(x)[, which(names(documents(x)) != "texts"), drop = FALSE]
-    if (is.null(field))
-        dvars <- dvars[, which(substring(names(dvars), 1, 1) != "_"), drop = FALSE]
-    get_docvars(dvars, field)
+    dvars <- documents(x)
+    dvars <- dvars[names(dvars) != 'texts']
+    get_docvars(dvars, field, FALSE)
 }
 
 #' @noRd
 #' @export
 docvars.tokens <- function(x, field = NULL) {
-    check_fields(x, field)
     dvars <- attr(x, "docvars")
-    if (is.null(field))
-        dvars <- dvars[, which(substring(names(dvars), 1, 1) != "_"), drop = FALSE]
-    get_docvars(dvars, field)    
+    get_docvars(dvars, field, FALSE)    
 }
 
 #' @noRd
 #' @export
 docvars.dfm <- function(x, field = NULL) {
-    check_fields(x, field)
     dvars <- x@docvars
-    if (is.null(field))
-        dvars <- dvars[, which(substring(names(dvars), 1, 1) != "_"), drop = FALSE]
-    get_docvars(dvars, field)    
+    get_docvars(dvars, field, FALSE)
 }
-
-## internal function to return the docvars for all docvars functions
-get_docvars <- function(dvars, field = NULL) {
-    if (is.null(field)) {
-        if (is.null(dvars)) {
-            return(data.frame())
-        } else {
-            return(dvars)
-        }
-    } else {
-        return(dvars[, field, drop = TRUE])
-    }
-}
-
 
 #' @rdname docvars
 #' @param value the new values of the document-level variable
@@ -97,14 +75,10 @@ get_docvars <- function(dvars, field = NULL) {
 #' @noRd
 #' @export
 "docvars<-.corpus" <- function(x, field = NULL, value) {
+    if (is.null(field)) stop("You should specify field.")
     if ("texts" %in% field) stop("You should use texts() instead to replace the corpus texts.")
-    if (is.null(field)) {
-        field <- names(value)
-        if (is.null(field))
-            field <- paste("docvar", seq_len(ncol(as.data.frame(value))), sep="")
-    }
     documents(x)[field] <- value
-    x
+    return(x)
 }
 
 ## internal only
@@ -114,9 +88,9 @@ get_docvars <- function(dvars, field = NULL) {
         attr(x, "docvars") <- value
     } else {
         if (!is.data.frame(attr(x, "docvars"))) {
-            meta <- data.frame(value, stringsAsFactors = FALSE)
-            colnames(meta) <- field
-            attr(x, "docvars") <- meta
+            dvars <- data.frame(value, stringsAsFactors = FALSE)
+            colnames(dvars) <- field
+            attr(x, "docvars") <- dvars
         } else {
             attr(x, "docvars")[[field]] <- value
         }
@@ -168,23 +142,17 @@ metadoc <- function(x, field = NULL)
 #' @noRd
 #' @export
 metadoc.corpus <- function(x, field = NULL) {
-    if (!is.null(field)) {
-        field <- paste0("_", field)
-        check_fields(x, field)
-    }
-    dvars <- documents(x)[, which(substring(names(documents(x)), 1, 1) == "_"), drop = FALSE]
-    get_docvars(dvars, field)
+    dvars <- documents(x)
+    dvars <- dvars[,names(dvars) != "texts"]
+    if (!check_docvars(x, field)) return(NULL)
+    get_docvars(dvars, field, TRUE)
 }
 
 #' @noRd
 #' @export
 metadoc.tokens <- function(x, field = NULL) {
-    if (!is.null(field)) {
-        field <- paste0("_", field)
-        check_fields(x, field)
-    }
-    dvars <- attr(x, "docvars")[, which(substring(names(attr(x, "docvars")), 1, 1) == "_"), drop = FALSE]
-    get_docvars(dvars, field)
+    if (!check_docvars(x, field)) return(NULL)
+    get_docvars(dvars, field, TRUE)
 }
 
 #' @noRd
@@ -192,10 +160,11 @@ metadoc.tokens <- function(x, field = NULL) {
 metadoc.dfm <- function(x, field = NULL) {
     if (!is.null(field)) {
         field <- paste0("_", field)
-        check_fields(x, field)
+        if (!check_docvars(x, field)){
+            return(NULL)
+        }
     }
-    dvars <- x@docvars[, which(substring(names(x@docvars), 1, 1) == "_"), drop = FALSE]
-    get_docvars(dvars, field)
+    get_docvars(dvars, field, TRUE)
 }
 
 #' @rdname metadoc
@@ -207,25 +176,40 @@ metadoc.dfm <- function(x, field = NULL) {
 #' @noRd
 #' @export
 "metadoc<-" <- function(x, field = NULL, value) {
-    # CHECK TO SEE THAT VALUE LIST IS IN VALID DOCUMENT-LEVEL METADATA LIST
-    # (this check not yet implemented)
     if (is.null(field)) {
-        field <- paste("_", names(value), sep="")
-        if (is.null(field))
-            field <- paste("_metadoc", seq_len(ncol(as.data.frame(value))), sep = "")
+        stop("You should specify field.")
     } else {
         field <- paste("_", field, sep="")
+        documents(x)[field] <- value
     }
-    documents(x)[field] <- value
-    x
+    return(x)
 }
 
-## helper function to check fields and report error message if
-## a field is not a valid docvar name
-check_fields <- function(x, field = NULL) {
-    if (!is.null(field)) {
-        if (length(notin <- which(! field %in% c(names(docvars(x)), names(metadoc(x))))))
-            stop("field(s) ", field[notin], " not found", call. = FALSE)
+## internal function to return the docvars for all docvars functions
+get_docvars <- function(dvars, fields = NULL, internal = FALSE) {
+    if (is.null(dvars))
+        dvars <- data.frame()
+    if (internal) {
+        dvars <- dvars[,stri_startswith_fixed(names(dvars), '_'), drop = FALSE]
+    } else {
+        dvars <- dvars[,!stri_startswith_fixed(names(dvars), '_'), drop = FALSE]
     }
+    if (!is.null(fields)) {
+        fields <- fields[fields %in% names(dvars)]
+        dvars <- dvars[, fields, drop = TRUE]
+    }
+    return(dvars)
+}
+
+## helper function to check fields
+check_docvars <- function(dvars, fields = NULL, internal = FALSE) {
+    if (is.null(dvars)) 
+        dvars <- data.frame()
+    if (internal) {
+        dvars <- dvars[,stri_startswith_fixed(names(dvars), '_'), drop = FALSE]
+    } else {
+        dvars <- dvars[,!stri_startswith_fixed(names(dvars), '_'), drop = FALSE]
+    }
+    return(fields %in% names(dvars))
 }
 

@@ -84,8 +84,7 @@ tokens_lookup.tokens <- function(x, dictionary, levels = 1:5,
     
     dictionary <- flatten_dictionary(dictionary, levels)
     valuetype <- match.arg(valuetype)
-    attrs <- attributes(x)
-    
+
     # Generate all combinations of type IDs
     entries_id <- list()
     keys_id <- c()
@@ -125,8 +124,10 @@ tokens_lookup.tokens <- function(x, dictionary, levels = 1:5,
     } else {
         result <- qatd_cpp_tokens_match(x, c(types, keys), entries_id, keys_id + length(types), FALSE)
     }
-    attributes(result, FALSE) <- attrs
+    docvars(result, "_doclen") <-  ntoken(x)
+    attributes(result, FALSE) <- attributes(x)
     attr(result, "what") <- "dictionary"
     attr(result, "dictionary") <- dictionary
+    
     return(result)
 }
